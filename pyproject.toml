@@ -1,0 +1,17 @@
+[project]
+name = "clp"
+version = "0.1.0"
+description = "copy file contents to clipboard"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyperclip>=1.8.2",
+    "pyobjc-framework-cocoa>=10.0; sys_platform == 'darwin'",
+]
+
+[project.scripts]
+clp = "clp.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
