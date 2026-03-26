@@ -2,11 +2,21 @@
 
 `clp` is a small QOL tool that copies file contents to your clipboard.
 
+## install
+
+```bash
+uv tool install .
+```
+
 ## usage
 
 ```bash
-uv run clp path/to/file.txt
+clp path/to/file.txt
+printf 'hello\n' | clp
+printf 'hello\n' | clp -
 ```
+
+for one-off runs while developing locally, `uv run clp ...` works too.
 
 works with text files and common image files (`png`, `jpg`, `jpeg`, `gif`, `bmp`, `tiff`, `webp`, `heic`, `heif`).
 

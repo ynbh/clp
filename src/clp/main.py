@@ -5,6 +5,7 @@ import base64
 import os
 import sys
 from pathlib import Path
+from typing import TextIO
 
 IMAGE_EXTENSIONS = {
     ".png",
@@ -83,18 +84,30 @@ def should_use_osc52(mode: str) -> bool:
     return is_ssh_session()
 
 
-def copy_text_to_clipboard(file_path: Path, mode: str) -> None:
-    text = file_path.read_text(encoding="utf-8")
+def copy_text_to_clipboard(text: str, mode: str, source_name: str) -> None:
     use_osc52 = should_use_osc52(mode)
     if use_osc52:
         write_to_terminal(build_osc52_sequence(text))
-        print(f"copied {len(text)} characters from {file_path} to client clipboard (osc52)")
+        print(f"copied {len(text)} characters from {source_name} to client clipboard (osc52)")
         return
 
     import pyperclip
 
     pyperclip.copy(text)
-    print(f"copied {len(text)} characters from {file_path} to clipboard")
+    print(f"copied {len(text)} characters from {source_name} to clipboard")
+
+
+def read_stdin_text(stream: TextIO) -> str:
+    if stream.isatty():
+        raise RuntimeError("stdin mode requires piped input")
+
+    return stream.read()
+
+
+def copy_stdin_to_clipboard(mode: str, stream: TextIO | None = None) -> None:
+    stdin = stream if stream is not None else sys.stdin
+    text = read_stdin_text(stdin)
+    copy_text_to_clipboard(text, mode, "stdin")
 
 
 def copy_file_to_clipboard(file_path: Path, mode: str) -> None:
@@ -104,7 +117,15 @@ def copy_file_to_clipboard(file_path: Path, mode: str) -> None:
         copy_image_to_clipboard(file_path)
         return
 
-    copy_text_to_clipboard(file_path, mode)
+    text = file_path.read_text(encoding="utf-8")
+    copy_text_to_clipboard(text, mode, str(file_path))
+
+
+def should_read_from_stdin(file_path: Path | None, stream: TextIO) -> bool:
+    if file_path is not None:
+        return str(file_path) == "-"
+
+    return not stream.isatty()
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -115,14 +136,19 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="auto",
         help="clipboard backend: auto (default), local, or osc52",
     )
-    parser.add_argument("file_path", type=Path, help="path to the file to copy")
+    parser.add_argument("file_path", nargs="?", type=Path, help="path to the file to copy, or - for stdin")
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     try:
         args = parse_args(argv if argv is not None else sys.argv[1:])
-        copy_file_to_clipboard(args.file_path, args.clipboard_mode)
+        if should_read_from_stdin(args.file_path, sys.stdin):
+            copy_stdin_to_clipboard(args.clipboard_mode)
+        elif args.file_path is not None:
+            copy_file_to_clipboard(args.file_path, args.clipboard_mode)
+        else:
+            raise RuntimeError("missing input: provide a file path or pipe text on stdin")
         return 0
     except ModuleNotFoundError as exc:
         if exc.name == "pyperclip":
